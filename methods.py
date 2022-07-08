@@ -411,7 +411,6 @@ def segmented_simplex_projection_DP_Maximin_Energy(n_total, n_bins):
         # points[(points[:,0] > bin_starts_x) & (points[:,0] < (bin_starts_x+diff)) & (points[:,2] > 10)]
         new_points = layer_wise_maximin(points_in, 0, 1)
         final_points = np.append(final_points, new_points, axis=0)
-    print(len(final_points))
     return final_points
             
 def duplicated_projected_DP_Energy(n_per_layer, n_bins):
@@ -429,13 +428,46 @@ def duplicated_projected_DP_Energy(n_per_layer, n_bins):
             
     return retpoints   
 
-def no_segmentation_projection_DP_Maximin_Energy(n):
-    total = np.linspace(0, 1.41+1.41 + 1 + 0, 10)
-    pts = 
+
+#make squaree go all thee way arround
+def no_segmentation_projection_DP_Maximin_Energy(n, sq_pts=10,dis=0.03):
+    total = np.linspace(0, 2**(1/2) * 2 + 2, sq_pts+1)[:-1]
     
+    sq = 2**(1/2)
+    sin2 = sq / 2
+    
+    
+    X1 = total[total <= sq]
+    Y1 = total[(total > sq) & (total <= sq+1)] - sq;
+    X2 = sq - ((total[(total > sq+1) & (total <= 2*sq+1)]) - (sq+1));
+    Y2 = total[total > 2*sq+1] - (2*sq+1)
+    
+    
+    pts = np.array([])
+    
+    a1 = np.reshape(X1,( len(X1),1)) * sin2
+    a2 = np.reshape(X2, (len(X2), 1)) * sin2
+    
+    
+    r1 = np.append(np.append(a1, 1-a1, axis=1), np.full((len(a1),1),-dis), axis=1)
+    r2 = np.append(np.append(a2, 1-a2, axis=1),np.full((len(a2),1),1+dis), axis=1)
+    
+    r3 = np.concatenate((np.full((len(Y1),1),1+dis), 
+                         np.full((len(Y1),1), -dis),
+                         np.reshape(Y1, (len(Y1),1))
+                         ),axis=1)
+    
+    
+    r4 = np.concatenate((np.full((len(Y2),1),-dis),
+                         np.full((len(Y2),1),1+dis),
+                         1 - np.reshape(Y2, (len(Y2),1))
+                         ),axis=1)
+
+
+    pts = np.concatenate((r1,r3,r2,r4));
     
     points = getRD(2, n, seed=np.random.randint(low=10, high=1000))
-    new_points = layer_wise_maximin(points,0,1)
+    new_points = layer_wise_maximin(points,0,1,otherpoints=pts)
     return new_points;
     
 def getMetricString(pts, vgm=None,rad=None, dmin=None):
