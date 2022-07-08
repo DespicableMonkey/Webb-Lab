@@ -1,0 +1,72 @@
+Running MM Trial # 1/5
+Trial Results:  [18.82, 0.0, 40.1, 19.22]
+Running MM Trial # 2/5
+Trial Results:  [19.13, 0.0, 39.11, 22.77]
+Running MM Trial # 3/5
+Trial Results:  [18.7, 0.0, 40.47, 20.64]
+Running MM Trial # 4/5
+Trial Results:  [18.14, 0.0, 42.27, 22.55]
+Running MM Trial # 5/5
+Trial Results:  [19.52, 0.0, 37.88, 22.25]
+=== FINAL RESULTS: MM ===
+Sq Area: 18.862000000000002 %
+Sq Overlap: 0.0 %
+Sq Waste: 39.966 %
+Triangle Area: 21.485999999999997 %
+
+
+
+Running LHS Trial # 1/5
+Trial Results:  [30.11, 1.27, 2.89, 28.34]
+Running LHS Trial # 2/5
+Trial Results:  [30.09, 0.68, 3.55, 30.42]
+Running LHS Trial # 3/5
+Trial Results:  [27.45, 6.8, 5.83, 25.81]
+Running LHS Trial # 4/5
+Trial Results:  [28.3, 3.63, 6.3, 22.11]
+Running LHS Trial # 5/5
+Trial Results:  [27.0, 3.6, 10.47, 18.59]
+=== FINAL RESULTS: LHS ===
+Sq Area: 28.589999999999996 %
+Sq Overlap: 3.1959999999999997 %
+Sq Waste: 5.808 %
+Triangle Area: 25.054000000000002 %
+
+
+
+Running Random Trial # 1/5
+Trial Results:  [26.4, 9.93, 6.03, 33.23]
+Running Random Trial # 2/5
+Trial Results:  [25.84, 3.42, 14.32, 24.39]
+Running Random Trial # 3/5
+Trial Results:  [29.25, 4.7, 2.2, 32.82]
+Running Random Trial # 4/5
+Trial Results:  [25.97, 12.27, 5.07, 28.93]
+Running Random Trial # 5/5
+Trial Results:  [28.78, 2.78, 5.62, 18.05]
+=== FINAL RESULTS: Random ===
+Sq Area: 27.248 %
+Sq Overlap: 6.62 %
+Sq Waste: 6.648000000000001 %
+Triangle Area: 27.484 %
+
+
+
+Running Seq MM Trial # 1/5
+Trial Results:  [27.11, 0.0, 13.71, 25.67]
+Running Seq MM Trial # 2/5
+Trial Results:  [24.44, 0.0, 22.21, 26.99]
+Running Seq MM Trial # 3/5
+Trial Results:  [25.42, 0.0, 19.1, 26.67]
+Running Seq MM Trial # 4/5
+Trial Results:  [26.84, 0.0, 14.57, 29.93]
+Running Seq MM Trial # 5/5
+Trial Results:  [25.71, 0.0, 18.18, 26.5]
+=== FINAL RESULTS: Seq MM ===
+Sq Area: 25.904000000000003 %
+Sq Overlap: 0.0 %
+Sq Waste: 17.554000000000002 %
+Triangle Area: 27.151999999999997 %
+
+
+
