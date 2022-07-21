@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from pandas.plotting import scatter_matrix
 import pandas as pd
-from regex import F
 from queue import Queue 
 import matplotlib.cm as cm
 from scipy.ndimage.filters import gaussian_filter
@@ -430,7 +429,8 @@ def duplicated_projected_DP_Energy(n_per_layer, n_bins):
 
 
 #make squaree go all thee way arround
-def no_segmentation_projection_DP_Maximin_Energy(n, sq_pts=10,dis=0.03):
+def no_segmentation_projection_DP_Maximin_Energy(n, sq_pts=10,dis=0.03, ax=None):
+    
     total = np.linspace(0, 2**(1/2) * 2 + 2, sq_pts+1)[:-1]
     
     sq = 2**(1/2)
@@ -466,6 +466,11 @@ def no_segmentation_projection_DP_Maximin_Energy(n, sq_pts=10,dis=0.03):
 
     pts = np.concatenate((r1,r3,r2,r4));
     
+    if(ax is not None):
+        plot_points3D(ax, pts,color='red')
+        ax.plot([0,1,1,0,0],[1,0,0,1,1],[0,0,1,1,0], color='purple')
+    
+    
     points = getRD(2, n, seed=np.random.randint(low=10, high=1000))
     new_points = layer_wise_maximin(points,0,1,otherpoints=pts)
     return new_points;
@@ -496,3 +501,6 @@ def getMetricString(pts, vgm=None,rad=None, dmin=None):
 #fix holE(√)
 #the paper about optimizations
 #remove bin(√))
+
+#lennard jones energy
+
