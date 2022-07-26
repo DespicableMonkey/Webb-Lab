@@ -1,17 +1,25 @@
-# %matplotlib widget
+    # %matplotlib widget
 
+from dis import dis
+from email.utils import encode_rfc2231
+from anyio import current_effective_deadline
 from pymoo.factory import get_visualization, get_reference_directions
 from pymoo.factory import get_performance_indicator
 import numpy as np
-from numpy import random, prod
+from numpy import random, prod, single
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from pandas.plotting import scatter_matrix
 import pandas as pd
 from queue import Queue 
 import matplotlib.cm as cm
+from pyrsistent import b
 from scipy.ndimage.filters import gaussian_filter
 import math
+import sys
+import autograd.numpy as anp
+import seaborn as sns
+from scipy.interpolate import make_interp_spline
 
 ''' Visualtion & Pymoo Methods '''
 def getmap3D(viewInitX=30, viewInitY=45, title=""):
@@ -230,6 +238,12 @@ def dich(num):
 
 def getRD(M, N, seed=128):
     return get_reference_directions("energy", M, N, seed=seed)
+
+def getRED(M, N, seed=128):
+    return get_reference_directions("red", M, N, seed=seed)
+
+def getCons(M, N,seed=128):
+    return get_reference_directions("con", M, N, seed=seed)
 
 '''Hypercube Methods'''
 def unif(num):
@@ -473,7 +487,7 @@ def no_segmentation_projection_DP_Maximin_Energy(n, sq_pts=10,dis=0.03, ax=None)
     
     points = getRD(2, n, seed=np.random.randint(low=10, high=1000))
     new_points = layer_wise_maximin(points,0,1,otherpoints=pts)
-    return new_points;
+    return (new_points, pts);
     
 def getMetricString(pts, vgm=None,rad=None, dmin=None):
     res = ''
@@ -504,3 +518,232 @@ def getMetricString(pts, vgm=None,rad=None, dmin=None):
 
 #lennard jones energy
 
+'''simulator'''
+
+def get_random_extSimplex_pt(n, dim):
+    M = sys.maxsize
+    rnd = np.random.random((n, dim))
+    rnd *= M
+    rnd = rnd[:, :dim - 1]
+    rnd = np.column_stack([np.zeros(n), rnd, np.full(n, M)])
+    rnd = np.sort(rnd, axis=1)
+
+    ret = np.full((n, dim), np.nan)
+    for i in range(1, dim + 1):
+        ret[:, i - 1] = rnd[:, i] - rnd[:, i - 1]
+    ret /= M
+
+    ret = np.append(ret, np.random.random((len(ret),1)),axis=1)
+
+    return ret
+
+def calc_pot_energy_grad(X):
+
+    d = X.shape[1]**3
+
+    distances = X[:, None] - X[None, :]
+
+    vect_distances = np.sqrt((distances ** 2).sum(axis=2))
+
+    np.fill_diagonal(vect_distances, np.inf)
+
+    eps = 10 ** (-320 / (d+2))
+    b = vect_distances < eps
+    vect_distances[b] = eps
+
+    single_distances = vect_distances[np.triu_indices(len(X),1)]
+
+    energy = (1 / single_distances ** d).sum()
+    log_energy = - np.long(len(single_distances)) + np.log(energy)
+
+    gradients = (-d * distances) / (vect_distances ** (d+2))[...,None]
+
+    gradients = np.sum(gradients, axis=1)
+    gradients /= energy
+
+    return (energy, gradients)
+
+
+
+def energy_step(X, opt):
+    energy, grad = calc_pot_energy_grad(X)
+
+    norm = np.linalg.norm(grad, axis=1)
+    grad = (grad / max(norm.max(), 1e-24))
+
+    X  = opt.next(X, grad)
+
+    return (X, energy)
+
+def energy_distrubute(pts,
+    alpha = 0.005,
+    maxruns = 10000,
+    termination_delta = 1e-6,
+    max_not_improved = 30
+):
+    n_not_improved = 0
+    n = len(pts)
+    optimizer = Adam(alpha = alpha)
+
+    current_energy = np.inf
+    bestX = pts
+
+    for run in range(maxruns):
+        X, energy = energy_step(pts, optimizer)
+
+        if(energy < current_energy):
+            current_energy = energy
+            bestX = X
+            n_not_improved = 0
+        else:
+            n_not_improved += 1
+        
+        delta = np.sqrt((pts[:n] - X[:n]) ** 2).mean(axis=1).mean()
+
+        if(delta < termination_delta or np.isnan(energy)):
+            break
+        
+        if(n_not_improved > max_not_improved):
+            optimizer = Adam(alpha=alpha / 2)
+            n_not_improved = 0
+            X = bestX
+        
+        pts = X
+    
+    return bestX[:n]
+
+    
+
+class Optimizer:
+
+    def __init__(self, precision=1e-6) -> None:
+        super().__init__()
+        self.has_converged = False
+        self.precision = precision
+
+    def next(self, X, dX):
+        _X = self._next(X, dX)
+
+        if np.abs(_X - X).mean() < self.precision:
+            self.has_converged = True
+
+        return _X
+
+
+class GradientDescent(Optimizer):
+
+    def __init__(self, learning_rate=0.01, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.learning_rate = learning_rate
+
+    def _next(self, X, dX):
+        return X - self.learning_rate * dX
+
+
+class Adam(Optimizer):
+
+    def __init__(self, alpha=0.01, beta_1=0.9, beta_2=0.999, epsilon=1e-8, **kwargs) -> None:
+        super().__init__(**kwargs)
+
+        self.alpha = alpha
+        self.beta_1 = beta_1
+        self.beta_2 = beta_2
+        self.epsilon = epsilon
+
+        self.m_t = 0
+        self.v_t = 0
+        self.t = 0
+
+    def _next(self, X, dX):
+        self.t += 1
+        beta_1, beta_2 = self.beta_1, self.beta_2
+
+        # update moving average of gradient and squared gradient
+        self.m_t = beta_1 * self.m_t + (1 - beta_1) * dX
+        self.v_t = beta_2 * self.v_t + (1 - beta_2) * (dX * dX)
+
+        # calculates the bias-corrected estimates
+        m_cap = self.m_t / (1 - (beta_1 ** self.t))
+        v_cap = self.v_t / (1 - (beta_2 ** self.t))
+
+        # do the gradient update
+        _X = X - (self.alpha * m_cap) / (np.sqrt(v_cap) + self.epsilon)
+
+        return _X
+
+def heatmap_nice(title, X, Y, burn):
+    hm = getmap2D()
+    hm.set_xticks([0,0.25, 0.5, 0.75, 1, 1.25])
+    hm.set_yticks([0,0.25, 0.5, 0.75,1])
+    hm.tick_params(axis='both', which='major', labelsize=12)
+    hm.set_title(title, fontsize=18)
+    drawheatmap(hm, X, Y, burn)
+
+def drawKDPlot(X, bw=0.3, clip=1, title="", height=1, ax=getmap2D()):
+    sns.set_style("whitegrid", {'axes.grid' : False})
+    sns.kdeplot(X,bw_method=bw, ax=ax, linewidth=3)
+    ax.grid(False)
+    ax.set_ylim(0, height)
+    ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4])
+    ax.set_xlim(0, clip)
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2])
+    ax.set_title(title, fontsize=18)
+    
+
+def drawSimplexExtend(title, pts, map=getmap3D()):
+    map.view_init(30,45)
+    map.plot([1,0], [0,0], [0,0], color='gray', linewidth=0.7, linestyle='--', dashes=(5, 3))
+    map.plot([0,0], [1,0], [0,0], color='gray', linewidth=0.7, linestyle='--', dashes=(3, 3))
+    map.plot([0,0], [0,0], [1,0], color='gray', linewidth=0.7, linestyle='--', dashes=(3, 3))
+
+    map.plot([1,0], [0,1], [0,0], color='black',linewidth=0.4)
+    map.plot([1,1], [0,0], [0,1], color='black',linewidth=0.4)
+    map.plot([1,0], [0,1], [1,1], color='black',linewidth=0.4)
+    map.plot([0,0], [1,1], [0,1], color='black',linewidth=0.4)
+
+    map.text(0.1,1,-0.1, "(0,1,0)")
+    map.text(0.1,1,1.1, "(0,1,1)")
+
+    map.text(1,-0.2,-0.3, "(1,0,0)")
+    map.text(1.1,0,1.1, "(1,0,1)")
+
+    map.grid(False)
+    map.axis('off')
+
+    map.scatter(pts[:,0], pts[:,1], pts[:,2], marker='o', depthshade=False, edgecolors='black', color='dodgerblue',s=20)
+
+    return map
+
+def draw2DPretty(title, X, Y, map=getmap2D()):
+    map.grid(False)
+    map.set_xlim(-0.1,1.1)
+    map.set_ylim(-0.1,1.1)
+    # map.axis('off')
+    map.scatter(X, Y, marker='o', edgecolors='black', color='dodgerblue',s=30)
+    map.set_title(title)
+
+    return map
+def draw2DExtra(ax, X, Y, color):
+    ax.scatter(X, Y, marker='o', edgecolors='black', color=color,s=30)
+
+
+def drawExtra(ax, pts, color='mediumpurple'):
+    ax.scatter(pts[:,0], pts[:,1], pts[:,2], marker='x', depthshade=False, edgecolors='black', color=color,s=20)
+
+def plotLine(ax, X,vals, color,label, title, dotted = False):
+    if(not dotted):
+        ax.plot(X, vals,color=color,label=label,linewidth=2,linestyle = '--',alpha=0.6)
+    else:
+        ax.plot(X, vals,color=color,label=label,linewidth=3,alpha=1)
+
+    ax.set_xticks([0,10,20, 30,40,50])
+    # ax.legend(frameon=False, loc='upper left',ncol=2,handlelength=4)
+    ax.set_title(title + " vs Points", fontsize=15)
+
+def spline(X, Y):
+    X = np.array(X)
+    Y = np.array(Y)
+    X_Y_Spline = make_interp_spline(X, Y)
+    X_ = np.linspace(X.min(), X.max(), 500)
+    Y_ = X_Y_Spline(X_)
+    return X_, Y_
